@@ -2,11 +2,28 @@
 class QuizManager {
     constructor() {
         this.questions = [];
+        this.correctAnswers = [];
         this.selectedAnswers = {};
+        this.examFinished = false;
         this.init();
     }
 
-    // Datos del cuestionario (copia aquí tu JSON)
+    // Cargar respuestas correctas desde respuestas.json
+    async loadCorrectAnswers() {
+        try {
+            const response = await fetch('respuestas.json');
+            if (!response.ok) {
+                throw new Error('No se pudo cargar el archivo respuestas.json');
+            }
+            this.correctAnswers = await response.json();
+            console.log('Respuestas correctas cargadas:', this.correctAnswers.length, 'preguntas');
+        } catch (error) {
+            console.error('Error al cargar respuestas correctas:', error);
+            alert('Error: No se pudo cargar el archivo de respuestas correctas. Asegúrate de que respuestas.json esté en la misma carpeta.');
+        }
+    }
+
+    // Datos del cuestionario
     loadQuestions() {
         this.questions = [
             {
@@ -17,7 +34,7 @@ class QuizManager {
                     "Un tipo de software de escritorio",
                     "Una red privada de servidores físicos"
                 ],
-                "correct_answer": 0
+                "correct_answer": null
             },
             {
                 "question": "¿Qué empresa tiene la mayor cuota de mercado en servicios en la nube?",
@@ -212,7 +229,8 @@ class QuizManager {
         ];
     }
 
-    init() {
+    async init() {
+        await this.loadCorrectAnswers();
         this.loadQuestions();
         this.renderQuestions();
         this.setupEventListeners();
@@ -259,11 +277,13 @@ class QuizManager {
     }
 
     selectAnswer(questionIndex, optionIndex) {
+        // No permitir cambios después de terminar el examen
+        if (this.examFinished) {
+            return;
+        }
+
         // Guardar la respuesta seleccionada
         this.selectedAnswers[questionIndex] = optionIndex;
-        
-        // Actualizar la respuesta correcta en el JSON
-        this.questions[questionIndex].correct_answer = optionIndex;
 
         // Actualizar la interfaz visual
         this.updateQuestionVisual(questionIndex, optionIndex);
@@ -274,14 +294,16 @@ class QuizManager {
         // Remover selección previa
         const questionButtons = document.querySelectorAll(`button[data-question="${questionIndex}"]`);
         questionButtons.forEach(btn => {
-            btn.classList.remove('btn-success', 'correct-answer');
+            btn.classList.remove('btn-success', 'btn-danger', 'correct-answer', 'incorrect-answer');
             btn.classList.add('btn-outline-primary');
         });
 
         // Marcar la nueva selección
         const selectedButton = document.querySelector(`button[data-question="${questionIndex}"][data-option="${selectedOption}"]`);
-        selectedButton.classList.remove('btn-outline-primary');
-        selectedButton.classList.add('btn-success', 'correct-answer');
+        if (!this.examFinished) {
+            selectedButton.classList.remove('btn-outline-primary');
+            selectedButton.classList.add('btn-success', 'correct-answer');
+        }
     }
 
     updateProgress() {
@@ -295,7 +317,7 @@ class QuizManager {
 
     setupEventListeners() {
         document.getElementById('save-answers').addEventListener('click', () => {
-            this.saveAnswers();
+            this.finishExam();
         });
 
         document.getElementById('reset-quiz').addEventListener('click', () => {
@@ -303,35 +325,112 @@ class QuizManager {
         });
     }
 
-    saveAnswers() {
-        if (Object.keys(this.selectedAnswers).length === 0) {
-            alert('Por favor, responde al menos una pregunta antes de guardar.');
+    finishExam() {
+        const totalQuestions = this.questions.length;
+        const answeredQuestions = Object.keys(this.selectedAnswers).length;
+
+        // Verificar que todas las preguntas estén contestadas
+        if (answeredQuestions < totalQuestions) {
+            const missingQuestions = totalQuestions - answeredQuestions;
+            alert(`Debes responder todas las preguntas antes de terminar el examen.\nTe faltan ${missingQuestions} pregunta(s) por responder.`);
+            
+            // Scroll a la primera pregunta sin responder
+            this.scrollToFirstUnanswered();
             return;
         }
 
-        // Crear el JSON actualizado
-        const updatedQuestions = this.questions.map(question => ({ ...question }));
-        
-        // Mostrar el JSON en la consola
-        console.log('Respuestas guardadas:', JSON.stringify(updatedQuestions, null, 2));
-        
-        // Mostrar resumen
-        this.showSummary();
-        
-        // Descargar el archivo JSON
-        this.downloadJSON(updatedQuestions);
-        
-        alert('¡Respuestas guardadas exitosamente! Revisa la consola del navegador y la descarga automática.');
+        if (this.correctAnswers.length === 0) {
+            alert('Error: No se han cargado las respuestas correctas. Verifica que el archivo respuestas.json esté disponible.');
+            return;
+        }
+
+        // Confirmar si el usuario quiere terminar
+        if (!confirm('¿Estás seguro de que quieres terminar el examen? No podrás cambiar las respuestas después.')) {
+            return;
+        }
+
+        this.examFinished = true;
+        this.checkAnswers();
+        this.showResults();
+        this.updateButtonsAfterFinish();
     }
 
-    showSummary() {
-        const answered = Object.keys(this.selectedAnswers).length;
-        const total = this.questions.length;
-        
-        const summaryText = `Has respondido ${answered} de ${total} preguntas (${Math.round((answered/total)*100)}%).`;
+    scrollToFirstUnanswered() {
+        for (let i = 0; i < this.questions.length; i++) {
+            if (!(i in this.selectedAnswers)) {
+                // Encontrar la primera pregunta sin responder y hacer scroll
+                const questionCard = document.querySelector(`button[data-question="${i}"]`).closest('.card');
+                if (questionCard) {
+                    questionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Añadir un efecto visual temporal
+                    questionCard.style.border = '3px solid #dc3545';
+                    setTimeout(() => {
+                        questionCard.style.border = '';
+                    }, 3000);
+                }
+                break;
+            }
+        }
+    }
+
+    checkAnswers() {
+        this.questions.forEach((question, index) => {
+            const userAnswer = this.selectedAnswers[index];
+            const correctAnswer = this.correctAnswers[index]?.correct_answer;
+            
+            if (userAnswer !== undefined) {
+                const questionButtons = document.querySelectorAll(`button[data-question="${index}"]`);
+                
+                // Limpiar estilos previos
+                questionButtons.forEach(btn => {
+                    btn.classList.remove('btn-success', 'btn-danger', 'btn-outline-primary');
+                    btn.disabled = true; // Deshabilitar botones
+                });
+
+                // Marcar respuesta correcta en verde
+                if (correctAnswer !== undefined) {
+                    const correctButton = document.querySelector(`button[data-question="${index}"][data-option="${correctAnswer}"]`);
+                    if (correctButton) {
+                        correctButton.classList.add('btn-success');
+                    }
+                }
+
+                // Si la respuesta del usuario es incorrecta, marcarla en rojo
+                if (userAnswer !== correctAnswer) {
+                    const userButton = document.querySelector(`button[data-question="${index}"][data-option="${userAnswer}"]`);
+                    if (userButton && userAnswer !== correctAnswer) {
+                        userButton.classList.add('btn-danger');
+                    }
+                }
+            }
+        });
+    }
+
+    showResults() {
+        const answeredQuestions = Object.keys(this.selectedAnswers).length;
+        let correctCount = 0;
+
+        // Contar respuestas correctas
+        Object.keys(this.selectedAnswers).forEach(questionIndex => {
+            const userAnswer = this.selectedAnswers[questionIndex];
+            const correctAnswer = this.correctAnswers[questionIndex]?.correct_answer;
+            if (userAnswer === correctAnswer) {
+                correctCount++;
+            }
+        });
+
+        const summaryText = `Respuestas correctas: ${correctCount} de ${answeredQuestions}`;
         
         document.getElementById('summary-text').textContent = summaryText;
         document.getElementById('results-summary').classList.remove('d-none');
+    }
+
+    updateButtonsAfterFinish() {
+        const saveButton = document.getElementById('save-answers');
+        saveButton.textContent = '✅ Examen Terminado';
+        saveButton.disabled = true;
+        saveButton.classList.remove('btn-success');
+        saveButton.classList.add('btn-secondary');
     }
 
     downloadJSON(data) {
@@ -351,19 +450,28 @@ class QuizManager {
     resetQuiz() {
         if (confirm('¿Estás seguro de que quieres reiniciar el cuestionario? Se perderán todas las respuestas.')) {
             this.selectedAnswers = {};
-            this.loadQuestions(); // Recargar preguntas originales
+            this.examFinished = false;
+            this.loadQuestions();
             this.renderQuestions();
             this.updateProgress();
             document.getElementById('results-summary').classList.add('d-none');
+            
+            // Restaurar botón de terminar examen
+            const saveButton = document.getElementById('save-answers');
+            saveButton.textContent = 'Terminar Examen';
+            saveButton.disabled = false;
+            saveButton.classList.remove('btn-secondary');
+            saveButton.classList.add('btn-success');
         }
     }
 
-    // Método para exportar las respuestas actuales
-    exportAnswers() {
+    // Método para exportar las respuestas del usuario
+    exportUserAnswers() {
         return {
-            answers: this.selectedAnswers,
-            questions: this.questions,
-            completed: Object.keys(this.selectedAnswers).length === this.questions.length
+            userAnswers: this.selectedAnswers,
+            correctAnswers: this.correctAnswers,
+            examFinished: this.examFinished,
+            timestamp: new Date().toISOString()
         };
     }
 }
