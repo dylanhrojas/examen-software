@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuestionario - Computación en la Nube</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .question-card {
+            margin-bottom: 2rem;
+        }
+        .option-btn {
+            margin-bottom: 0.5rem;
+        }
+        .correct-answer {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb !important;
+        }
+        .progress-text {
+            font-weight: bold;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="text-center mb-4">
+                    <h1 class="display-5">Cuestionario de Computación en la Nube</h1>
+                    <p class="lead">Selecciona la respuesta correcta para cada pregunta</p>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="progress-text">Progreso:</span>
+                        <span id="progress-text" class="progress-text">0 de 20</span>
+                    </div>
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Questions Container -->
+                <div id="questions-container">
+                    <!-- Questions will be loaded here -->
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="text-center mt-4">
+                    <button id="save-answers" class="btn btn-success btn-lg me-3">
+                        <i class="bi bi-save"></i> Guardar Respuestas
+                    </button>
+                    <button id="reset-quiz" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-arrow-clockwise"></i> Reiniciar
+                    </button>
+                </div>
+
+                <!-- Results Summary -->
+                <div id="results-summary" class="mt-4 d-none">
+                    <div class="alert alert-info">
+                        <h4>Resumen de Respuestas</h4>
+                        <p id="summary-text"></p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <!-- Quiz Script -->
+    <script src="quiz-manager.js"></script>
+</body>
+</html>
